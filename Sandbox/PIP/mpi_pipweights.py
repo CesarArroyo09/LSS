@@ -4,12 +4,20 @@
 Example of how one could compute PIP weights in parallel.
 """
 
+# ------------------------------------------------------------------------------
+# IMPORTING LIBRARIES
+#
+# The different libraries are imported here. We will be using:
+# - mpi4py
+# - numpy
+# - fiberassign/1.0.0
+# ------------------------------------------------------------------------------
+
+
 from mpi4py import MPI
 
 import os
 import sys
-
-import argparse
 
 from bitarray import bitarray
 
@@ -33,14 +41,9 @@ from fiberassign.targets import (
 
 from fiberassign.assign import Assignment, run
 
+import argparse
 
-
-def main():
-    log = Logger.get()
-
-    mpi_procs = MPI.COMM_WORLD.size
-    mpi_rank = MPI.COMM_WORLD.rank
-
+def parseOptions(comm):
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--survey_log", type=str, required=False,
@@ -76,8 +79,28 @@ def main():
     parser.add_argument("--realizations", type=int, required=False, default=10,
                         help="Number of realizations.")
 
-    args = parser.parse_args()
+    args = None
+    try:
+        if comm.Get_rank() == 0:
+            args = parser.parse_args()
+    finally:
+        args = comm.bcast(args, root=0)
 
+    if args is None:
+        exit(0)
+    return args
+
+def main():
+    log = Logger.get()
+    
+    # Variable for world communicator, number of MPI tasks and rank of the present MPI
+    # process.
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    args = parseOptions(comm)
+    
     if args.sky is None:
         args.sky = list()
 
