@@ -63,7 +63,11 @@ import fitsio
 
 import fiberassign
 
-from fiberassign.utils import Logger, distribute_discrete
+from fiberassign.utils import Logger
+
+# This distribute_discrete function is not inside fiberassign. Commenting for now.
+# (23/11/2020)
+from fiberassign.utils import distribute_discrete
 
 from fiberassign.hardware import load_hardware
 

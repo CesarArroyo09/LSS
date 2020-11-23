@@ -63,11 +63,7 @@ import fitsio
 
 import fiberassign
 
-from fiberassign.utils import Logger
-
-# This distribute_discrete function is not inside fiberassign. Commenting for now.
-# (23/11/2020)
-from fiberassign.utils import distribute_discrete
+from fiberassign.utils import Logger, distribute_discrete
 
 from fiberassign.hardware import load_hardware
 
@@ -93,6 +89,61 @@ def main():
     rank = comm.Get_rank()
     
     print('I am rank {} and this is the MTL file provided:\n {}'.format(args.mtl))
+    
+    # ------------------------------------------------------------------------------------
+    # READING AND LOADING THE RELEVANT DATA
+    #
+    # In this part of the code the main objects to be used are defined and the data to 
+    # make the assignation process is loaded.
+    # ------------------------------------------------------------------------------------
+    
+    # Set output directory
+    if args.out is None:
+        args.out = "."
+
+    # Read tiles we are using
+    tileselect = None
+    if args.tiles is not None:
+        tileselect = list()
+        with open(args.tiles, "r") as f:
+            for line in f:
+                # Try to convert the first column to an integer.
+                try:
+                    tileselect.append(int(line.split()[0]))
+                except ValueError:
+                    pass
+    tiles = load_tiles(
+        tiles_file=args.footprint,
+        select=tileselect,
+    )
+
+    # Create empty target list
+    tgs = Targets()
+    
+    # Append each input target file.  These target files must all be of the
+    # same survey type, and will set the Targets object to be of that survey.
+
+    for tgfile in args.targets:
+        load_target_file(tgs, tgfile)
+
+    # Just the science target IDs
+    tg_science = tgs.ids()
+    tg_science2indx = {y: x for x, y in enumerate(tg_science)}
+
+    # Now load the sky target files.
+    survey = tgs.survey()
+    for tgfile in args.sky:
+        load_target_file(tgs, tgfile)
+        
+    # Divide up realizations among the processes.
+
+    n_realization = args.realizations
+    realizations = np.arange(n_realization, dtype=np.int32)
+    my_realizations = np.array_split(realizations, mpi_procs)[mpi_rank]
+
+    # Bitarray for all targets and realizations
+    tgarray = bitarray(len(tg_science) * n_realization)
+    tgarray.setall(False)
 
 if __name__ == '__main__':
     main()
